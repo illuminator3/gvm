@@ -772,8 +772,6 @@ func (reader *ClassReader) ReadClassFile() *ClassFile {
 		constantPool[i] = reader.ReadClassPoolInfo()
 	}
 
-	fmt.Println(constantPool)
-
 	accessFlags := reader.ReadUint16()
 	thisClass := reader.ReadUint16()
 	superClass := reader.ReadUint16()
@@ -787,9 +785,6 @@ func (reader *ClassReader) ReadClassFile() *ClassFile {
 	}
 
 	methodsCount := reader.ReadUint16()
-
-	fmt.Println(methodsCount)
-
 	methods := make([]MemberInfo, methodsCount)
 
 	for i := 0; i < int(methodsCount); i++ {
@@ -825,12 +820,6 @@ func (reader *ClassReader) ReadMemberInfo(cp []ClassPoolInfo) MemberInfo {
 	attributesCount := reader.ReadUint16()
 	attributes := make([]AttributeInfo, attributesCount)
 
-	fmt.Println(accessFlags)
-	fmt.Println(nameIndex)
-	fmt.Println(descriptorIndex)
-	fmt.Println(attributesCount)
-	fmt.Println(attributes)
-
 	for i := 0; i < int(attributesCount); i++ {
 		attributes[i] = reader.ReadAttributeInfo(cp)
 	}
@@ -848,10 +837,6 @@ func (reader *ClassReader) ReadAttributeInfo(cp []ClassPoolInfo) AttributeInfo {
 	attributeNameIndex := reader.ReadUint16()
 	attributeLength := reader.ReadUint32()
 	attributeName := AsString(cp[attributeNameIndex])
-
-	fmt.Println(attributeNameIndex)
-	fmt.Println(attributeLength)
-	fmt.Println(attributeName)
 
 	return AttributeInfo{
 		attributeNameIndex,
