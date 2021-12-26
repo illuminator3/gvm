@@ -198,107 +198,87 @@ func (reader *ClassReader) ReadUint64s(n uint64) []uint64 {
 	return val
 }
 
-const (
-	ConstantClass              = 7
-	ConstantFieldref           = 9
-	ConstantMethodref          = 10
-	ConstantInterfacemethodref = 11
-	ConstantString             = 8
-	ConstantInteger            = 3
-	ConstantFloat              = 4
-	ConstantLong               = 5
-	ConstantDouble             = 6
-	ConstantNameandtype        = 12
-	ConstantUtf8               = 1
-	ConstantMethodhandle       = 15
-	ConstantMethodtype         = 16
-	ConstantDynamic            = 17
-	ConstantInvokedynamic      = 18
-	ConstantModule             = 19
-	ConstantPackage            = 20
-)
-
 func (reader *ClassReader) ReadClassPoolInfo() ClassPoolInfo {
 	tag := reader.ReadUint8()
 	switch tag {
-	case ConstantClass:
+	case 7:
 		return &Class{
 			nameIndex: reader.ReadUint16(),
 		}
-	case ConstantFieldref:
+	case 9:
 		return &FieldRef{
 			classIndex:       reader.ReadUint16(),
 			nameAndTypeIndex: reader.ReadUint16(),
 		}
-	case ConstantMethodref:
+	case 10:
 		return &MethodRef{
 			classIndex:       reader.ReadUint16(),
 			nameAndTypeIndex: reader.ReadUint16(),
 		}
-	case ConstantInterfacemethodref:
+	case 11:
 		return &InterfaceMethodRef{
 			classIndex:       reader.ReadUint16(),
 			nameAndTypeIndex: reader.ReadUint16(),
 		}
-	case ConstantString:
+	case 8:
 		return &String{
 			stringIndex: reader.ReadUint16(),
 		}
-	case ConstantInteger:
+	case 3:
 		return &Integer{
 			bytes: reader.ReadUint32(),
 		}
-	case ConstantFloat:
+	case 4:
 		return &Float{
 			bytes: reader.ReadUint32(),
 		}
-	case ConstantLong:
+	case 5:
 		return &Long{
 			highBytes: reader.ReadUint32(),
 			lowBytes:  reader.ReadUint32(),
 		}
-	case ConstantDouble:
+	case 6:
 		return &Double{
 			highBytes: reader.ReadUint32(),
 			lowBytes:  reader.ReadUint32(),
 		}
-	case ConstantNameandtype:
+	case 12:
 		return &NameAndType{
 			nameIndex:       reader.ReadUint16(),
 			descriptorIndex: reader.ReadUint16(),
 		}
-	case ConstantUtf8:
+	case 1:
 		length := reader.ReadUint16()
 		bytes := reader.ReadUint8s(uint64(length))
 		return &UTF8{
 			length: length,
 			bytes:  bytes,
 		}
-	case ConstantMethodhandle:
+	case 15:
 		return &MethodHandle{
 			referenceKind:  reader.ReadUint8(),
 			referenceIndex: reader.ReadUint16(),
 		}
-	case ConstantMethodtype:
+	case 16:
 		return &MethodType{
 			descriptorIndex: reader.ReadUint16(),
 		}
-	case ConstantDynamic:
+	case 17:
 		return &Dynamic{
 			bootstrapMethodAttrIndex: reader.ReadUint16(),
 			nameAndTypeIndex:         reader.ReadUint16(),
 		}
-	case ConstantInvokedynamic:
+	case 18:
 		return &InvokeDynamic{
 			bootstrapMethodAttrIndex: reader.ReadUint16(),
 			nameAndTypeIndex:         reader.ReadUint16(),
 		}
-	case ConstantModule:
+	case 19:
 		return &ModuleClassPoolInfo{
 			nameIndex:    reader.ReadUint16(),
 			versionIndex: reader.ReadUint16(),
 		}
-	case ConstantPackage:
+	case 20:
 		return &Package{
 			nameIndex: reader.ReadUint16(),
 		}
