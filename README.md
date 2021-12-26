@@ -2,7 +2,7 @@
 
 ## TODO
 
-- [ ] class file reading
+- [x] class file reading
 - [ ] runtime execution
 - [ ] command line interface
 - [ ] documentation
