@@ -6,7 +6,7 @@ func RunCode(instr []Instruction, lv []RuntimeLocalVariable, env *JEnv, this *JM
 	}
 }
 
-func (aaload Instructionaaload) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aaload Instructionaaload) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, _ []RuntimeLocalVariable, stack *Stack) {
 	index := stack.PopInt()
 	arrayref := stack.PopRef().(JArray)
 
@@ -17,7 +17,7 @@ func (aaload Instructionaaload) Execute(env *JEnv, this *JMetaObject, rcp Runtim
 	stack.PushRef(arrayref.GetRef(index))
 }
 
-func (aastore Instructionaastore) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aastore Instructionaastore) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, _ []RuntimeLocalVariable, stack *Stack) {
 	ref := stack.PopRef()
 	index := stack.PopInt()
 	arrayref := stack.PopRef().(JArray)
@@ -29,27 +29,27 @@ func (aastore Instructionaastore) Execute(env *JEnv, this *JMetaObject, rcp Runt
 	arrayref.SetRef(index, ref)
 }
 
-func (aconstNull InstructionaconstNull) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aconstNull InstructionaconstNull) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, _ []RuntimeLocalVariable, stack *Stack) {
 	stack.PushRef(nil)
 }
 
-func (aload Instructionaload) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aload Instructionaload) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
 	stack.PushRef(lv[aload.Index].obj)
 }
 
-func (aload0 Instructionaload0) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aload0 Instructionaload0) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
 	stack.PushRef(lv[0].obj)
 }
 
-func (aload1 Instructionaload1) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aload1 Instructionaload1) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
 	stack.PushRef(lv[1].obj)
 }
 
-func (aload2 Instructionaload2) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aload2 Instructionaload2) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
 	stack.PushRef(lv[2].obj)
 }
 
-func (aload3 Instructionaload3) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
+func (aload3 Instructionaload3) Execute(_ *JEnv, _ *JMetaObject, _ RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack) {
 	stack.PushRef(lv[3].obj)
 }
 
