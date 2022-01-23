@@ -3,7 +3,7 @@
 ## TODO
 
 - [x] class file reading
-- [ ] runtime execution
+- [ ] runtime execution (partially done)
 - [ ] type verification of stack pops
 - [ ] exceptions
 - [ ] class file verification
