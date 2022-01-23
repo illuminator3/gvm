@@ -87,7 +87,7 @@ type NameAndType struct {
 	descriptorIndex uint16
 }
 
-type UTF8 struct {
+type Utf8 struct {
 	ClassPoolInfo
 
 	length uint16
@@ -124,8 +124,7 @@ type InvokeDynamic struct {
 type ModuleClassPoolInfo struct {
 	ClassPoolInfo
 
-	nameIndex    uint16
-	versionIndex uint16
+	nameIndex uint16
 }
 
 type Package struct {
@@ -250,7 +249,7 @@ func (reader *ClassReader) ReadClassPoolInfo() ClassPoolInfo {
 	case 1:
 		length := reader.ReadUint16()
 		bytes := reader.ReadUint8s(uint64(length))
-		return &UTF8{
+		return &Utf8{
 			length: length,
 			bytes:  bytes,
 		}
@@ -275,8 +274,7 @@ func (reader *ClassReader) ReadClassPoolInfo() ClassPoolInfo {
 		}
 	case 19:
 		return &ModuleClassPoolInfo{
-			nameIndex:    reader.ReadUint16(),
-			versionIndex: reader.ReadUint16(),
+			nameIndex: reader.ReadUint16(),
 		}
 	case 20:
 		return &Package{
@@ -290,7 +288,7 @@ func (reader *ClassReader) ReadClassPoolInfo() ClassPoolInfo {
 }
 
 func AsString(info ClassPoolInfo) string {
-	if utf8, ok := info.(*UTF8); ok {
+	if utf8, ok := info.(*Utf8); ok {
 		return string(utf8.bytes)
 	}
 
