@@ -7,7 +7,7 @@
 - [x] class file reading
 - [ ] runtime execution (partially done)
 - [ ] type verification of stack pops
-- [ ] assure type of last frame stack push when returning cntr to caller frame
+- [ ] assure type of last frame stack push when returning control to caller frame
 - [ ] exceptions
 - [ ] class file verification
 - [ ] command line interface
