@@ -2,10 +2,38 @@ package main
 
 import "fmt"
 
-type Runtime struct{}
+type Runtime struct {
+	resources *Resources
+}
 
-func CreateRuntime() Runtime {
-	return Runtime{}
+func CreateRuntime(resources map[string]ClassFile) Runtime {
+	return Runtime{
+		resources: &Resources{
+			classes: resources,
+		},
+	}
+}
+
+func (r *Runtime) AddResource(name string, class ClassFile) {
+	r.resources.classes[name] = class
+}
+
+func (r *Runtime) AddResources(resources map[string]ClassFile) {
+	for name, class := range resources {
+		r.resources.classes[name] = class
+	}
+}
+
+func (r *Runtime) GetResource(name string) ClassFile {
+	if resource, ok := r.resources.classes[name]; ok {
+		return resource
+	}
+
+	panic(fmt.Sprintf("Unknown class %s", name))
+}
+
+func (r *Runtime) GetResources() map[string]ClassFile {
+	return r.resources.classes
 }
 
 func (env *JEnv) createClassLoader(parent *ClassLoader) *ClassLoader {
@@ -22,16 +50,21 @@ func (env *JEnv) createClassLoader(parent *ClassLoader) *ClassLoader {
 	return &cl
 }
 
-func makeEnv() *JEnv {
-	return &JEnv{}
+func (r *Runtime) makeEnv() *JEnv {
+	return &JEnv{
+		runtime: r,
+		frame:   &Frame{
+			/* root frame */
+		},
+	}
 }
 
-func (r *Runtime) Run(class ClassFile) {
-	env := makeEnv()
+func (r *Runtime) Run(class string) {
+	env := r.makeEnv()
 	classLoader := env.createClassLoader(nil)
-	klass := classLoader.createRuntimeClass(env, class)
+	klass := classLoader.findOrLoadClass(env, class)
 
-	klass.FindMethod("main", "([Ljava/lang/String;)V").Invoke(env, klass, klass.metaObject, []interface{}{})
+	klass.FindMethod("main", "([Ljava/lang/String;)V").Invoke(env, klass, nil, []interface{}{})
 }
 
 func (c *RuntimeClass) FindMethod(name, descriptor string) *Method {
@@ -44,6 +77,10 @@ func (c *RuntimeClass) FindMethod(name, descriptor string) *Method {
 	return nil
 }
 
+func (jmo *JMetaObject) init(env *JEnv, cdesc string /* default ()V */, args []interface{}) {
+	jmo.class.FindMethod("<init>", cdesc).Invoke(env, jmo.class, jmo, args)
+}
+
 func (m *Method) Invoke(env *JEnv, klass RuntimeClass, this *JMetaObject, args []interface{}) bool {
 	if m == nil {
 		// this method doesn't exist, tf you're tryna do?
@@ -51,13 +88,22 @@ func (m *Method) Invoke(env *JEnv, klass RuntimeClass, this *JMetaObject, args [
 		return false // fail
 	}
 
-	if !this.initialized {
+	// TODO call <clinit>
+
+	if this != nil && !this.initialized {
 		this.initialized = true
 
-		klass.FindMethod("<init>", "()V").Invoke(env, klass, this, []interface{}{})
+		//klass.FindMethod("<init>", "()V").Invoke(env, klass, this, []interface{}{})
+		this.init(env, "()V", []interface{}{})
 	}
 
-	RunCode(m.code, putLocals(m.locals, this, args), env, this, m.maxStack)
+	env.frame = &Frame{
+		stack:       StackOf(m.maxStack),
+		root:        env.frame,
+		classLoader: klass.classLoader,
+	}
+
+	RunCode(m.code, putLocals(m.locals, this, args), env, this, klass)
 
 	return true // success!
 }
@@ -79,9 +125,20 @@ type RuntimeLocalVariable struct {
 }
 
 type JEnv struct {
-	stack           *Stack
+	runtime         *Runtime
 	classLoaders    []*ClassLoader
 	rootClassLoader *ClassLoader
+	frame           *Frame
+}
+
+type Resources struct {
+	classes map[string]ClassFile
+}
+
+type Frame struct {
+	stack       *Stack
+	root        *Frame
+	classLoader *ClassLoader
 }
 
 type Stack struct {
@@ -128,16 +185,6 @@ func (s *Stack) check(n int) {
 	}
 }
 
-func (s *Stack) PopInt() (i PrimitiveInt) {
-	s.check(1)
-
-	i = s.PopRef().(JPrimitive).primitive.(PrimitiveInt)
-
-	s.values = s.values[:len(s.values)-1]
-
-	return
-}
-
 func (s *Stack) PopRef() (o interface{}) {
 	s.check(1)
 
@@ -148,18 +195,62 @@ func (s *Stack) PopRef() (o interface{}) {
 	return
 }
 
-func (s *Stack) PushInt(i PrimitiveInt) {
-	s.ready(1)
+func (s *Stack) PopArray() JArray {
+	return s.PopRef().(JArray)
+}
 
-	pri := NewPrimitiveInt(i)
+func (s *Stack) PopInt() PrimitiveInt {
+	return s.PopRef().(JPrimitive).primitive.(PrimitiveInt)
+}
 
-	s.values = append(s.values, &pri)
+func (s *Stack) PopByte() PrimitiveByte {
+	return s.PopRef().(JPrimitive).primitive.(PrimitiveByte)
+}
+
+func (s *Stack) PopFloat() PrimitiveFloat {
+	return s.PopRef().(JPrimitive).primitive.(PrimitiveFloat)
+}
+
+func (s *Stack) PopDouble() PrimitiveDouble {
+	return s.PopRef().(JPrimitive).primitive.(PrimitiveDouble)
+}
+
+func (s *Stack) PopLong() PrimitiveLong {
+	return s.PopRef().(JPrimitive).primitive.(PrimitiveLong)
 }
 
 func (s *Stack) PushRef(o interface{}) {
 	s.ready(1)
 
 	s.values = append(s.values, o)
+}
+
+func (s *Stack) PushInt(i PrimitiveInt) {
+	s.PushRef(NewPrimitiveInt(i))
+}
+
+func (s *Stack) PushByte(b PrimitiveByte) {
+	s.PushRef(NewPrimitiveByte(b))
+}
+
+func (s *Stack) PushFloat(f PrimitiveFloat) {
+	s.PushRef(NewPrimitiveFloat(f))
+}
+
+func (s *Stack) PushDouble(d PrimitiveDouble) {
+	s.PushRef(NewPrimitiveDouble(d))
+}
+
+func (s *Stack) PushLong(l PrimitiveLong) {
+	s.PushRef(NewPrimitiveLong(l))
+}
+
+func (s *Stack) PushShort(p PrimitiveShort) {
+	s.PushRef(NewPrimitiveShort(p))
+}
+
+func (s *Stack) PushChar(p PrimitiveChar) {
+	s.PushRef(NewPrimitiveChar(p))
 }
 
 func NewPrimitiveInt(i PrimitiveInt) interface{} {
@@ -179,6 +270,86 @@ func NewPrimitiveIntD(i int32) interface{} {
 func NewPrimitiveIntRD(i int32) PrimitiveInt {
 	return PrimitiveInt{
 		value: i,
+	}
+}
+
+func NewPrimitiveByte(b PrimitiveByte) interface{} {
+	return JPrimitive{
+		primitive: b,
+	}
+}
+
+func NewPrimitiveByteD(b byte) interface{} {
+	return JPrimitive{
+		primitive: PrimitiveByte{
+			value: b,
+		},
+	}
+}
+
+func NewPrimitiveByteRD(b byte) PrimitiveByte {
+	return PrimitiveByte{
+		value: b,
+	}
+}
+
+func NewPrimitiveFloat(f PrimitiveFloat) interface{} {
+	return JPrimitive{
+		primitive: f,
+	}
+}
+
+func NewPrimitiveFloatRD(f float32) PrimitiveFloat {
+	return PrimitiveFloat{
+		value: f,
+	}
+}
+
+func NewPrimitiveDouble(d PrimitiveDouble) interface{} {
+	return JPrimitive{
+		primitive: d,
+	}
+}
+
+func NewPrimitiveDoubleRD(d float64) PrimitiveDouble {
+	return PrimitiveDouble{
+		value: d,
+	}
+}
+
+func NewPrimitiveLong(l PrimitiveLong) interface{} {
+	return JPrimitive{
+		primitive: l,
+	}
+}
+
+func NewPrimitiveLongRD(l int64) PrimitiveLong {
+	return PrimitiveLong{
+		value: l,
+	}
+}
+
+func NewPrimitiveShort(s PrimitiveShort) interface{} {
+	return JPrimitive{
+		primitive: s,
+	}
+}
+
+func NewPrimitiveShortRD(l int16) PrimitiveShort {
+	return PrimitiveShort{
+		value: l,
+	}
+}
+
+func NewPrimitiveChar(c PrimitiveChar) interface{} {
+	return JPrimitive{
+		primitive: c,
+	}
+}
+
+func NewPrimitiveCharRD(c int32) PrimitiveChar {
+	return PrimitiveChar{
+		value: c,
 	}
 }
 
@@ -212,23 +383,57 @@ func (a JArray) ArrayLengthD() int32 {
 type JMetaObject struct {
 	//JObject
 
-	class        *RuntimeClass
-	constantPool *RuntimeConstantPool
-	initialized  bool
-}
-
-type JRObject struct {
-	//JObject
-
-	class *RuntimeClass
-	data  map[string]interface{}
+	class       RuntimeClass
+	initialized bool
+	data        map[string]interface{} // fields
 }
 
 type JArray struct {
 	//JObject
 
-	data []interface{}
+	atype byte
+	data  []interface{}
 }
+
+func (env *JEnv) createArray(atype byte, length int32) JArray {
+	return JArray{
+		atype: atype,
+		data:  make([]interface{}, length),
+	}
+}
+
+func (cl *ClassLoader) makeString(env *JEnv, value string) *JMetaObject {
+	// create the object
+	obj := cl.createObject(env, "java/lang/String")
+
+	// init it with the str value
+	// by first creating a char array
+	carr := env.createArray(jaChar, int32(len(value)))
+
+	// put the chars into the array
+	for i, c := range value {
+		carr.SetRefD(int32(i), NewPrimitiveCharRD(c))
+	}
+
+	// call the constructor
+	obj.init(env, "([C)V", []interface{}{carr})
+
+	// finally, return the string object
+	return obj
+}
+
+const (
+	jaReference = 0
+	jaArray     = 1
+	jaBoolean   = 2
+	jaChar      = 3
+	jaFloat     = 4
+	jaDouble    = 5
+	jaByte      = 6
+	jaShort     = 7
+	jaInt       = 8
+	jaLong      = 9
+)
 
 type JPrimitive struct {
 	//JObject
@@ -239,27 +444,247 @@ type JPrimitive struct {
 type Primitive interface{}
 
 type PrimitiveInt struct {
-	Primitive
+	//Primitive
 
 	value int32
 }
 
+func (i PrimitiveInt) ToByte() PrimitiveByte {
+	return NewPrimitiveByteRD(byte(i.value))
+}
+
+func (i PrimitiveInt) ToChar() PrimitiveChar {
+	return NewPrimitiveCharRD(i.value)
+}
+
+func (i PrimitiveInt) ToDouble() PrimitiveDouble {
+	return NewPrimitiveDoubleRD(float64(i.value))
+}
+
+func (i PrimitiveInt) ToFloat() PrimitiveFloat {
+	return NewPrimitiveFloatRD(float32(i.value))
+}
+
+func (i PrimitiveInt) ToLong() PrimitiveLong {
+	return NewPrimitiveLongRD(int64(i.value))
+}
+
+func (i PrimitiveInt) ToShort() PrimitiveShort {
+	return NewPrimitiveShortRD(int16(i.value))
+}
+
+func (i PrimitiveInt) Add(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value + j.value)
+}
+
+func (i PrimitiveInt) And(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value & j.value)
+}
+
+func (i PrimitiveInt) Div(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value / j.value)
+}
+
+func (i PrimitiveInt) Mul(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value * j.value)
+}
+
+func (i PrimitiveInt) Neg() PrimitiveInt {
+	return NewPrimitiveIntRD(-i.value)
+}
+
+func (i PrimitiveInt) Or(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value | j.value)
+}
+
+func (i PrimitiveInt) Rem(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value % j.value)
+}
+
+func (i PrimitiveInt) Shl(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value << (j.value & 0x1f))
+}
+
+func (i PrimitiveInt) Shr(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value >> (j.value & 0x1f))
+}
+
+func (i PrimitiveInt) Sub(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value - j.value)
+}
+
+func (i PrimitiveInt) Xor(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(i.value ^ j.value)
+}
+
+func (i PrimitiveInt) Ushr(j PrimitiveInt) PrimitiveInt {
+	return NewPrimitiveIntRD(int32(uint32(i.value) >> (j.value & 0x1f)))
+}
+
 type PrimitiveLong struct {
-	Primitive
+	//Primitive
 
 	value int64
 }
 
+func (l PrimitiveLong) ToDouble() PrimitiveDouble {
+	return NewPrimitiveDoubleRD(float64(l.value))
+}
+
+func (l PrimitiveLong) ToFloat() PrimitiveFloat {
+	return NewPrimitiveFloatRD(float32(l.value))
+}
+
+func (l PrimitiveLong) ToInt() PrimitiveInt {
+	return NewPrimitiveIntRD(int32(l.value))
+}
+
+func (l PrimitiveLong) Add(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value + j.value)
+}
+
+func (l PrimitiveLong) Div(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value / j.value)
+}
+
+func (l PrimitiveLong) Mul(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value * j.value)
+}
+
+func (l PrimitiveLong) Neg() PrimitiveLong {
+	return NewPrimitiveLongRD(-l.value)
+}
+
+func (l PrimitiveLong) Rem(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value % j.value)
+}
+
+func (l PrimitiveLong) Or(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value | j.value)
+}
+
+func (l PrimitiveLong) Shl(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value << (j.value & 0x3f))
+}
+
+func (l PrimitiveLong) Shr(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value >> (j.value & 0x3f))
+}
+
+func (l PrimitiveLong) Sub(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value - j.value)
+}
+
+func (l PrimitiveLong) Xor(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(l.value ^ j.value)
+}
+
+func (l PrimitiveLong) Ushr(j PrimitiveLong) PrimitiveLong {
+	return NewPrimitiveLongRD(int64(uint64(l.value) >> (j.value & 0x3f)))
+}
+
 type PrimitiveFloat struct {
-	Primitive
+	//Primitive
 
 	value float32
 }
 
+func (f PrimitiveFloat) Add(o PrimitiveFloat) PrimitiveFloat {
+	return PrimitiveFloat{
+		value: f.value + o.value,
+	}
+}
+
+func (f PrimitiveFloat) Neg() PrimitiveFloat {
+	return PrimitiveFloat{
+		value: -f.value,
+	}
+}
+
+func (f PrimitiveFloat) Sub(o PrimitiveFloat) PrimitiveFloat {
+	return f.Add(o.Neg())
+}
+
+func (f PrimitiveFloat) Mul(o PrimitiveFloat) PrimitiveFloat {
+	return PrimitiveFloat{
+		value: f.value * o.value,
+	}
+}
+
+func (f PrimitiveFloat) Div(o PrimitiveFloat) PrimitiveFloat {
+	return PrimitiveFloat{
+		value: f.value / o.value,
+	}
+}
+
+func (f PrimitiveFloat) Rem(o PrimitiveFloat) PrimitiveFloat {
+	return PrimitiveFloat{
+		value: float32(int32(f.value) % int32(o.value)),
+	}
+}
+
+func (f PrimitiveFloat) ToDouble() PrimitiveDouble {
+	return NewPrimitiveDoubleRD(float64(f.value))
+}
+
+func (f PrimitiveFloat) ToInt() PrimitiveInt {
+	return NewPrimitiveIntRD(int32(f.value))
+}
+
+func (f PrimitiveFloat) ToLong() PrimitiveLong {
+	return NewPrimitiveLongRD(int64(f.value))
+}
+
 type PrimitiveDouble struct {
-	Primitive
+	//Primitive
 
 	value float64
+}
+
+func (d PrimitiveDouble) Add(o PrimitiveDouble) PrimitiveDouble {
+	return PrimitiveDouble{
+		value: d.value + o.value,
+	}
+}
+
+func (d PrimitiveDouble) Neg() PrimitiveDouble {
+	return PrimitiveDouble{
+		value: -d.value,
+	}
+}
+
+func (d PrimitiveDouble) Sub(o PrimitiveDouble) PrimitiveDouble {
+	return d.Add(o.Neg())
+}
+
+func (d PrimitiveDouble) Mul(o PrimitiveDouble) PrimitiveDouble {
+	return PrimitiveDouble{
+		value: d.value * o.value,
+	}
+}
+
+func (d PrimitiveDouble) Div(o PrimitiveDouble) PrimitiveDouble {
+	return PrimitiveDouble{
+		value: d.value / o.value,
+	}
+}
+
+func (d PrimitiveDouble) Rem(o PrimitiveDouble) PrimitiveDouble {
+	return PrimitiveDouble{
+		value: float64(int64(d.value) % int64(o.value)), // TODO might not work
+	}
+}
+
+func (d PrimitiveDouble) ToFloat() PrimitiveFloat {
+	return NewPrimitiveFloatRD(float32(d.value))
+}
+
+func (d PrimitiveDouble) ToInt() PrimitiveInt {
+	return NewPrimitiveIntRD(int32(d.value))
+}
+
+func (d PrimitiveDouble) ToLong() PrimitiveLong {
+	return NewPrimitiveLongRD(int64(d.value))
 }
 
 type PrimitiveBoolean struct {
@@ -283,7 +708,7 @@ type PrimitiveShort struct {
 type PrimitiveChar struct {
 	Primitive
 
-	value uint16
+	value int32
 }
 
 type PrimitiveVoid struct {
@@ -292,16 +717,17 @@ type PrimitiveVoid struct {
 
 type ClassLoader struct {
 	parent  *ClassLoader
-	classes map[string]*Class
+	classes map[string]*RuntimeClass
 }
 
 type RuntimeClass struct {
-	classLoader *ClassLoader
-	methods     map[string]*Method
-	fields      map[string]*Field
-	name        string
-	flags       []ClassAccessFlag
-	metaObject  *JMetaObject
+	classLoader  *ClassLoader
+	methods      map[string]*Method
+	fields       map[string]*Field
+	name         string
+	flags        []ClassAccessFlag
+	constantPool *RuntimeConstantPool
+	staticFields map[string]interface{}
 }
 
 type Method struct {
@@ -454,22 +880,32 @@ func cFAF(value uint16) FieldAccessFlag {
 
 func (cl *ClassLoader) createRuntimeClass(env *JEnv, class ClassFile) (cls RuntimeClass) {
 	cls = RuntimeClass{
-		classLoader: cl,
-		methods:     mapMethods(class.methods, class.constantPool),
-		fields:      mapFields(class, class.constantPool),
-		name:        AsString(class.constantPool[class.constantPool[class.thisClass].(*Class).nameIndex]),
-		flags:       mapCAccessFlags(class.accessFlags),
-		metaObject:  nil,
+		classLoader:  cl,
+		methods:      mapMethods(class.methods, class.constantPool),
+		fields:       mapFields(class, class.constantPool),
+		name:         AsString(class.constantPool[class.constantPool[class.thisClass].(*Class).nameIndex]),
+		flags:        mapCAccessFlags(class.accessFlags),
+		constantPool: Transform(class), // added in post lmao
 	}
 
-	cls.metaObject = &JMetaObject{
-		class:        &cls,
-		constantPool: Transform(class),
-	}
-
-	cls.FindMethod("<clinit>", "()V").Invoke(env, cls, cls.metaObject, []interface{}{})
+	cls.FindMethod("<clinit>", "()V").Invoke(env, cls, nil, []interface{}{})
 
 	return
+}
+
+func (cl *ClassLoader) findOrLoadClass(env *JEnv, name string) RuntimeClass {
+	if cls, ok := cl.classes[name]; ok {
+		return *cls
+	}
+
+	return cl.createRuntimeClass(env, env.runtime.GetResource(name))
+}
+
+func (cl *ClassLoader) createObject(env *JEnv, class string) *JMetaObject {
+	return &JMetaObject{
+		class: cl.findOrLoadClass(env, class),
+		data:  map[string]interface{}{},
+	}
 }
 
 func mapMethods(members []MemberInfo, cp []ClassPoolInfo) map[string]*Method {
@@ -477,7 +913,6 @@ func mapMethods(members []MemberInfo, cp []ClassPoolInfo) map[string]*Method {
 
 	for _, member := range members {
 		name := AsString(cp[member.nameIndex])
-
 		mai := findMethodAttributeInfo(member, cp)
 
 		methods[name] = &Method{

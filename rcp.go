@@ -12,7 +12,92 @@ type RBootstrapMethod struct {
 	arguments          []RuntimeConstantPoolInfo
 }
 
-type RuntimeConstantPoolInfo interface{}
+type RuntimeConstantPoolInfo interface {
+	id() byte
+}
+
+const (
+	RClassID        = 1
+	RFieldRefID     = 2
+	RMethodRefID    = 3
+	RStringID       = 4
+	RIntegerID      = 5
+	RFloatID        = 6
+	RLongID         = 7
+	RDoubleID       = 8
+	RNameAndTypeMID = 9
+	RNameAndTypeFID = 10
+	RUtf8ID         = 11
+	RMethodHandleID = 12
+	RMethodTypeID   = 13
+	RDynamicID      = 14
+	RModuleID       = 15
+	RPackageID      = 16
+)
+
+func (_ RClass) id() byte {
+	return RClassID
+}
+
+func (_ RFieldRef) id() byte {
+	return RFieldRefID
+}
+
+func (_ RMethodRef) id() byte {
+	return RMethodRefID
+}
+
+func (_ RString) id() byte {
+	return RStringID
+}
+
+func (_ RInteger) id() byte {
+	return RIntegerID
+}
+
+func (_ RFloat) id() byte {
+	return RFloatID
+}
+
+func (_ RLong) id() byte {
+	return RLongID
+}
+
+func (_ RDouble) id() byte {
+	return RDoubleID
+}
+
+func (_ RNameAndTypeM) id() byte {
+	return RNameAndTypeMID
+}
+
+func (_ RNameAndTypeF) id() byte {
+	return RNameAndTypeFID
+}
+
+func (_ RUtf8) id() byte {
+	return RUtf8ID
+}
+
+func (_ RMethodHandle) id() byte {
+	return RMethodHandleID
+}
+
+func (_ RMethodType) id() byte {
+	return RMethodTypeID
+}
+
+func (_ RDynamic) id() byte {
+	return RDynamicID
+}
+
+func (_ RModule) id() byte {
+	return RModuleID
+}
+
+func (_ RPackage) id() byte {
+	return RPackageID
+}
 
 type RClass struct {
 	RuntimeConstantPoolInfo
@@ -200,7 +285,7 @@ func transformInfo(cp []ClassPoolInfo, info ClassPoolInfo) RuntimeConstantPoolIn
 		}
 	case *Long:
 		return &RLong{
-			value: (int64(info.highBytes) << 32) | int64(info.lowBytes), // TODO rework
+			value: (int64(info.highBytes) << 32) | int64(info.lowBytes),
 		}
 	case *Double:
 		return &RDouble{

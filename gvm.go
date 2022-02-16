@@ -16,9 +16,14 @@ func main() {
 	}
 
 	cf := reader.ReadClassFile()
-	runtime := CreateRuntime()
 
-	runtime.Run(*cf)
+	resources := make(map[string]ClassFile)
+
+	resources["Test"] = *cf
+
+	runtime := CreateRuntime(resources)
+
+	runtime.Run("Test")
 
 	//fmt.Printf("%#v\n", cf)
 }

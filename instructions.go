@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 type Instruction interface {
-	Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack)
+	Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame)
 }
 
 type Instructionaaload struct { // 0x32
@@ -1269,6 +1269,8 @@ func ParseInstruction(bytes *ByteContainer) Instruction {
 	case 0xc3:
 		return Instructionmonitorexit{}
 	case 0xc4:
+		// TODO read this stupid instruction
+
 		return Instructionwide{
 			Opcode: bytes.NextByte(),
 		}
