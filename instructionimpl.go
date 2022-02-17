@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 func RunCode(instr []Instruction, lv []RuntimeLocalVariable, env *JEnv, this *JMetaObject, klass RuntimeClass) {
 	for _, i := range instr {
@@ -157,7 +160,7 @@ func (bipush Instructionbipush) Execute(env *JEnv, this *JMetaObject, rcp Runtim
 }
 
 func (breakpoint Instructionbreakpoint) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
-	// TODO
+	panic("No implementation for breakpoint instruction")
 }
 
 func (caload Instructioncaload) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
@@ -169,7 +172,15 @@ func (castore Instructioncastore) Execute(env *JEnv, this *JMetaObject, rcp Runt
 }
 
 func (checkcast Instructioncheckcast) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
-	// TODO
+	obj := stack.PopRef()
+
+	// TODO arrays
+
+	if rcp.infos[checkcast.Index].(RClass).name != obj.(JMetaObject).class.name {
+		// TODO throw exception
+	}
+
+	stack.PushRef(obj) // repush obj
 }
 
 func (d2f Instructiond2f) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
@@ -197,11 +208,29 @@ func (dastore Instructiondastore) Execute(env *JEnv, this *JMetaObject, rcp Runt
 }
 
 func (dcmpg Instructiondcmpg) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
-	// TODO
+	v2 := stack.PopDouble().value
+	v1 := stack.PopDouble().value
+
+	if math.IsNaN(v1) || math.IsNaN(v2) || v1 > v2 {
+		stack.PushInt(NewPrimitiveIntRD(1))
+	} else if v1 == v2 {
+		stack.PushInt(NewPrimitiveIntRD(0))
+	} else {
+		stack.PushInt(NewPrimitiveIntRD(-1))
+	}
 }
 
 func (dcmpl Instructiondcmpl) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
-	// TODO
+	v2 := stack.PopDouble().value
+	v1 := stack.PopDouble().value
+
+	if math.IsNaN(v1) || math.IsNaN(v2) || v1 < v2 {
+		stack.PushInt(NewPrimitiveIntRD(-1))
+	} else if v1 == v2 {
+		stack.PushInt(NewPrimitiveIntRD(0))
+	} else {
+		stack.PushInt(NewPrimitiveIntRD(1))
+	}
 }
 
 func (dconst0 Instructiondconst0) Execute(env *JEnv, this *JMetaObject, rcp RuntimeConstantPool, lv []RuntimeLocalVariable, stack *Stack, frame *Frame) {
