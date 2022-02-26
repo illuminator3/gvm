@@ -1,11 +1,23 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
 )
 
 func main() {
-	bytes, err := os.ReadFile("Test.class")
+	file := *flag.String("file", "", "file to run")
+
+	flag.Parse()
+
+	if len(file) == 0 {
+		fmt.Println("Usage: gvm -file <file>")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	bytes, err := os.ReadFile(file)
 
 	if err != nil {
 		panic(err)
@@ -19,11 +31,9 @@ func main() {
 
 	resources := make(map[string]ClassFile)
 
-	resources["Test"] = *cf
+	resources[file] = *cf
 
 	runtime := CreateRuntime(resources)
 
-	runtime.Run("Test")
-
-	//fmt.Printf("%#v\n", cf)
+	runtime.Run(file)
 }
