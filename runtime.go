@@ -139,6 +139,8 @@ type Frame struct {
 	stack       *Stack
 	root        *Frame
 	classLoader *ClassLoader
+	pc          uint16
+	tpc         uint16
 }
 
 type Stack struct {
@@ -734,7 +736,7 @@ type Method struct {
 	name          string
 	rawDescriptor string
 	accessFlags   []MethodAccessFlag
-	code          []Instruction
+	code          map[uint16]Instruction
 	maxStack      int
 	maxLocals     int
 	descriptor    MethodDescriptor
@@ -958,7 +960,7 @@ func mapLocalVariables(maxLocals int, lvt LocalVariableTable, cp []ClassPoolInfo
 	return
 }
 
-func makeCode(mai MethodAttributeInfo) []Instruction {
+func makeCode(mai MethodAttributeInfo) map[uint16]Instruction {
 	if mai.code == nil {
 		return nil
 	}

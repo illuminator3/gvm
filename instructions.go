@@ -743,11 +743,16 @@ type Instructionwide struct { // 0xc4
 	Opcode byte
 }
 
-func ParseInstructions(bytes []byte) (instructions []Instruction) {
+func ParseInstructions(bytes []byte) (instructions map[uint16]Instruction) {
 	container := ByteContainer{bytes, 0}
 
+	instructions = make(map[uint16]Instruction)
+
 	for container.HasNext() {
-		instructions = append(instructions, ParseInstruction(&container))
+		pre := container.bytesRead
+
+		//instructions = append(instructions, ParseInstruction(&container))
+		instructions[uint16(pre)] = ParseInstruction(&container)
 	}
 
 	return

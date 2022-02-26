@@ -5,13 +5,43 @@ import (
 	"math"
 )
 
-func RunCode(instr []Instruction, lv []RuntimeLocalVariable, env *JEnv, this *JMetaObject, klass RuntimeClass) {
-	for _, i := range instr {
-		fmt.Printf("Stack before instruction %v\n", env.frame.stack)
+func getKeys(m map[uint16]Instruction) []uint16 {
+	keys := make([]uint16, 0, len(m))
 
-		i.Execute(env, this, *klass.constantPool, lv, checkStack(env.frame), env.frame)
+	for k := range m {
+		keys = append(keys, k)
+	}
 
-		fmt.Printf("Stack after instruction %v\n", env.frame.stack)
+	return keys
+}
+
+func mapPC(instr []uint16) map[uint16]uint16 {
+	m := make(map[uint16]uint16)
+
+	for i, v := range instr {
+		m[uint16(i)] = v
+	}
+
+	return m
+}
+
+func RunCode(instr map[uint16]Instruction, lv []RuntimeLocalVariable, env *JEnv, this *JMetaObject, klass RuntimeClass) {
+	tpcMap := mapPC(getKeys(instr))
+	frame := env.frame
+	pclen := uint16(len(instr))
+
+	frame.pc = 0
+	frame.tpc = tpcMap[0]
+
+	for frame.pc < pclen {
+		before := frame.tpc
+
+		instr[frame.tpc].Execute(env, this, *klass.constantPool, lv, checkStack(env.frame), env.frame)
+
+		if before == frame.tpc {
+			frame.pc++
+			frame.tpc = tpcMap[frame.pc]
+		}
 	}
 }
 
@@ -97,8 +127,6 @@ func (anewarray Instructionanewarray) Execute(env *JEnv, this *JMetaObject, rcp 
 }
 
 func _return(env *JEnv, control interface{}) {
-	fmt.Println(env.frame)
-
 	frame := env.frame
 	root := frame.root
 
